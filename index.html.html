@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>E&C IMMO — Checklists Appartements</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f3ef;
+    --card: #ffffff;
+    --border: #e8e3da;
+    --accent: #e8622a;
+    --accent-light: #fdf0eb;
+    --green: #22c55e;
+    --green-light: #f0fdf4;
+    --green-border: #bbf7d0;
+    --text: #1a1a1a;
+    --muted: #888;
+    --subtle: #f3f0ea;
+  }
+  body { font-family: 'Inter', 'Segoe UI', sans-serif; background: var(--bg); min-height: 100vh; color: var(--text); }
+
+  /* ── HEADER ── */
+  .header { background: var(--text); color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; }
+  .header-logo { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .header-sub { font-size: 12px; color: #aaa; margin-top: 1px; }
+  .header-spacer { flex: 1; }
+  .status-pill { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.1); border-radius: 20px; padding: 4px 10px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #f97316; transition: background 0.3s; }
+  .status-dot.on { background: var(--green); }
+  .status-text { font-size: 11px; color: #ccc; }
+
+  /* ── VIEWS ── */
+  #view-home, #view-apt { display: none; }
+  #view-home.active, #view-apt.active { display: block; }
+
+  /* ── HOME ── */
+  .home-wrap { max-width: 720px; margin: 0 auto; padding: 32px 16px; }
+  .home-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .home-sub { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+
+  .apt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .apt-card {
+    background: var(--card); border: 1.5px solid var(--border); border-radius: 14px;
+    padding: 18px 16px; cursor: pointer; transition: all 0.15s; position: relative;
+  }
+  .apt-card:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(232,98,42,0.1); transform: translateY(-2px); }
+  .apt-card-icon { font-size: 26px; margin-bottom: 10px; }
+  .apt-card-name { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 8px; line-height: 1.3; }
+  .apt-card-bar-bg { background: var(--subtle); border-radius: 4px; height: 5px; overflow: hidden; margin-bottom: 5px; }
+  .apt-card-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s; }
+  .apt-card-pct { font-size: 12px; color: var(--muted); }
+  .apt-card-delete {
+    position: absolute; top: 10px; right: 10px;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: transparent; border: none; cursor: pointer;
+    color: #ccc; font-size: 16px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; opacity: 0;
+  }
+  .apt-card:hover .apt-card-delete { opacity: 1; }
+  .apt-card-delete:hover { background: #fee2e2; color: #dc2626; }
+
+  /* Add card */
+  .apt-card-add {
+    background: transparent; border: 2px dashed var(--border); border-radius: 14px;
+    padding: 18px 16px; cursor: pointer; transition: all 0.15s;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 130px; gap: 8px; color: var(--muted);
+  }
+  .apt-card-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+  .apt-card-add-icon { font-size: 28px; }
+  .apt-card-add-label { font-size: 14px; font-weight: 600; }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--card); border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 400px; }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .modal-sub { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+  .modal-input { width: 100%; border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 15px; outline: none; font-family: inherit; }
+  .modal-input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .btn-primary { flex: 1; padding: 10px; border-radius: 10px; border: none; background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-primary:hover { background: #d4561f; }
+  .btn-ghost { flex: 1; padding: 10px; border-radius: 10px; border: 1.5px solid var(--border); background: transparent; color: var(--muted); font-size: 15px; cursor: pointer; }
+  .btn-ghost:hover { background: var(--subtle); }
+
+  /* Confirm delete modal */
+  .modal-danger { color: #dc2626; }
+  .btn-danger { flex: 1; padding: 10px; border-radius: 10px; border: none; background: #dc2626; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-danger:hover { background: #b91c1c; }
+
+  /* ── APT VIEW ── */
+  .apt-wrap { max-width: 680px; margin: 0 auto; padding: 24px 16px; }
+  .back-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); cursor: pointer; margin-bottom: 20px; padding: 6px 0; border: none; background: none; font-family: inherit; }
+  .back-btn:hover { color: var(--text); }
+  .apt-header { margin-bottom: 24px; }
+  .apt-name { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+  .progress-bar-bg { background: var(--border); border-radius: 8px; height: 10px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; border-radius: 8px; transition: width 0.3s, background 0.3s; }
+  .progress-labels { display: flex; justify-content: space-between; margin-top: 6px; }
+  .progress-count { font-size: 13px; color: var(--muted); }
+  .progress-pct { font-size: 13px; font-weight: 700; }
+
+  /* Checklist sections */
+  .cl-section { background: var(--card); border-radius: 12px; margin-bottom: 10px; border: 1.5px solid var(--border); overflow: hidden; }
+  .cl-section.done { border-color: var(--green-border); }
+  .cl-section-header { display: flex; align-items: center; padding: 13px 16px; cursor: pointer; gap: 10px; user-select: none; }
+  .cl-section.done .cl-section-header { background: var(--green-light); }
+  .cl-section-emoji { font-size: 17px; }
+  .cl-section-title { font-weight: 600; font-size: 14px; flex: 1; }
+  .cl-section-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: var(--subtle); color: var(--muted); white-space: nowrap; }
+  .cl-section.done .cl-section-badge { background: #dcfce7; color: #16a34a; }
+  .cl-section-arrow { color: #bbb; font-size: 11px; }
+  .cl-section-body { padding: 2px 16px 12px; }
+  .cl-item { display: flex; align-items: flex-start; gap: 10px; padding: 7px 4px; cursor: pointer; border-bottom: 1px solid var(--subtle); }
+  .cl-item:last-of-type { border-bottom: none; }
+  .cl-checkbox { width: 18px; height: 18px; border-radius: 5px; border: 2px solid #d1ccc3; background: #fff; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .cl-checkbox.checked { background: var(--green); border-color: var(--green); }
+  .cl-item-label { font-size: 14px; color: var(--text); line-height: 1.4; transition: color 0.15s; }
+  .cl-item-label.checked { color: #9ca3af; text-decoration: line-through; }
+  .cl-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .cl-btn { font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--subtle); cursor: pointer; color: #555; font-family: inherit; }
+  .cl-btn:hover { background: var(--border); }
+
+  .success-banner { text-align: center; padding: 20px; background: var(--green-light); border-radius: 12px; border: 1.5px solid var(--green-border); margin-top: 8px; display: none; }
+  .success-banner.visible { display: block; }
+
+  .empty-state { text-align: center; padding: 48px 16px; color: var(--muted); }
+  .empty-state-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state-text { font-size: 15px; }
+
+  @media (max-width: 480px) {
+    .apt-grid { grid-template-columns: 1fr 1fr; }
+    .header-logo { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <div class="header-logo">E&C IMMO</div>
+    <div class="header-sub">Checklists lancement</div>
+  </div>
+  <div class="header-spacer"></div>
+  <div class="status-pill">
+    <div class="status-dot" id="status-dot"></div>
+    <div class="status-text" id="status-text">Connexion…</div>
+  </div>
+</div>
+
+<!-- HOME VIEW -->
+<div id="view-home">
+  <div class="home-wrap">
+    <div class="home-title">Mes appartements</div>
+    <div class="home-sub">Clique sur un appartement pour accéder à sa checklist.</div>
+    <div class="apt-grid" id="apt-grid">
+      <div class="apt-card-add" id="btn-add-apt">
+        <div class="apt-card-add-icon">＋</div>
+        <div class="apt-card-add-label">Ajouter un appartement</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APT VIEW -->
+<div id="view-apt">
+  <div class="apt-wrap">
+    <button class="back-btn" id="btn-back">← Tous les appartements</button>
+    <div class="apt-header">
+      <div class="apt-name" id="apt-view-name"></div>
+      <div style="margin-top:12px;">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="apt-progress-fill" style="width:0%;background:var(--accent);"></div>
+        </div>
+        <div class="progress-labels">
+          <span class="progress-count" id="apt-progress-count">0 / 0 éléments</span>
+          <span class="progress-pct" id="apt-progress-pct" style="color:var(--accent);">0%</span>
+        </div>
+      </div>
+    </div>
+    <div id="apt-checklist"></div>
+    <div class="success-banner" id="apt-success">
+      <div style="font-size:32px;">🎉</div>
+      <div style="font-weight:700;color:#16a34a;font-size:16px;margin-top:6px;">Appartement 100% prêt à être mis en ligne !</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AJOUTER -->
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <div class="modal-title">Nouvel appartement</div>
+    <div class="modal-sub">Entre le nom ou l'adresse de l'appartement.</div>
+    <input class="modal-input" id="modal-add-input" type="text" placeholder="ex: Asnières T2 rue Voltaire" maxlength="60"/>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modal-add-cancel">Annuler</button>
+      <button class="btn-primary" id="modal-add-confirm">Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SUPPRIMER -->
+<div class="modal-overlay" id="modal-delete">
+  <div class="modal">
+    <div class="modal-title modal-danger">⚠️ Supprimer l'appartement</div>
+    <div class="modal-sub" id="modal-delete-sub">Toutes les données de cet appartement seront perdues définitivement.</div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modal-delete-cancel">Annuler</button>
+      <button class="btn-danger" id="modal-delete-confirm">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, remove, push, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDvWwwFNu3CqXdhfGvAkOwQ49r1aegs2QA",
+  authDomain: "checklist---ec-immo.firebaseapp.com",
+  databaseURL: "https://checklist---ec-immo-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "checklist---ec-immo",
+  storageBucket: "checklist---ec-immo.firebasestorage.app",
+  messagingSenderId: "234644047678",
+  appId: "1:234644047678:web:92ffedf71853ebc5c58e6f"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ── DATA ──────────────────────────────────────────────────────────
+const SECTIONS = [
+  { id: "admin", emoji: "📋", title: "Administratif & Légal", items: [
+    "Autorisation de sous-location signée par le propriétaire",
+    "Déclaration en mairie (numéro d'enregistrement si commune concernée)",
+    "Vérification règlement de copropriété (autorisation location meublée)",
+    "Assurance habitation couvrant la sous-location / activité Airbnb",
+    "Assurance responsabilité civile pro (si via société)",
+    "Contrat de bail avec clause de sous-location à jour",
+    "Vérification taxe de séjour (paramétrage Airbnb ou déclaration manuelle)",
+    "DPE (Diagnostic de Performance Énergétique) à jour",
+    "Détecteur de fumée installé et fonctionnel",
+    "Détecteur CO (si chaudière gaz ou chauffe-eau)",
+  ]},
+  { id: "wifi", emoji: "📡", title: "WiFi & Connectivité", items: [
+    "Routeur / box installé et testé",
+    "SIM activée avec forfait data suffisant",
+    "SSID et mot de passe WiFi notés pour le guide",
+    "Test débit (min. 20 Mbps recommandé pour Airbnb)",
+    "Router fixé / positionné de façon discrète",
+    "Plan B prévu (rechargement SIM ou deuxième réseau)",
+  ]},
+  { id: "entree", emoji: "🚪", title: "Entrée & Accès", items: [
+    "Serrure à code ou boîte à clé installée",
+    "Code d'accès testé depuis l'extérieur",
+    "Double de clé disponible (en cas de panne/urgence)",
+    "Instructions d'accès claires rédigées",
+    "Digicode immeuble / badge fonctionnel documenté",
+    "Règles maison affichées ou dans le livret",
+  ]},
+  { id: "salon", emoji: "🛋️", title: "Salon / Séjour", items: [
+    "Canapé (+ canapé-lit si studio/petite surface)",
+    "Table basse",
+    "Télévision (+ télécommande avec piles)",
+    "Connexion TV (TNT, Netflix, ou clé HDMI)",
+    "Lampe de sol ou d'appoint",
+    "Miroir",
+    "Rideaux ou stores (occultants si besoin)",
+    "Prises électriques accessibles (multiprises si nécessaire)",
+    "Poubelle",
+  ]},
+  { id: "chambre", emoji: "🛏️", title: "Chambre(s)", items: [
+    "Lit avec sommier/matelas de qualité",
+    "Oreillers (2 par personne minimum)",
+    "Couette adaptée à la saison",
+    "Protège-matelas",
+    "Draps (2 sets par lit minimum)",
+    "Taies d'oreillers (2 sets par oreiller)",
+    "Table de chevet + lampe",
+    "Rangement (armoire, penderie ou commode)",
+    "Cintres (minimum 10)",
+    "Miroir",
+    "Rideaux / stores occultants",
+    "Prises électriques accessibles",
+  ]},
+  { id: "cuisine", emoji: "🍳", title: "Cuisine", items: [
+    "Réfrigérateur fonctionnel",
+    "Plaques de cuisson (induction ou gaz)",
+    "Four ou micro-ondes (idéalement les deux)",
+    "Bouilloire",
+    "Cafetière (filtre ou capsules)",
+    "Grille-pain",
+    "Casseroles et poêles (2-3 tailles)",
+    "Couverts (fourchettes, couteaux, cuillères) pour la capacité max",
+    "Assiettes plates et creuses",
+    "Verres (eau + vin)",
+    "Tasses et mugs",
+    "Planche à découper",
+    "Couteaux de cuisine",
+    "Ouvre-boîte / tire-bouchon",
+    "Spatules, louche, passoire",
+    "Plat allant au four",
+    "Éponges, liquide vaisselle, torchons",
+    "Poubelle avec sacs",
+    "Sacs poubelle en stock",
+    "Sel, poivre, huile (consommables de base)",
+    "Café, thé, sucre (bienvenue)",
+    "Papier essuie-tout",
+  ]},
+  { id: "sdb", emoji: "🚿", title: "Salle de bain", items: [
+    "Serviettes de bain (2 par personne minimum)",
+    "Serviettes de main (1 par personne)",
+    "Tapis de bain",
+    "Rideau de douche ou paroi propre",
+    "Miroir",
+    "Sèche-cheveux fonctionnel",
+    "Savon corps / gel douche (premier stock)",
+    "Shampoing (premier stock)",
+    "Gel douche / savon de main à la lavabo",
+    "Papier toilette (stock pour 2-3 jours minimum)",
+    "Poubelle avec sacs",
+    "Brosse WC",
+    "Produits ménagers SDB (spray, éponge)",
+    "Crochet / porte-serviettes suffisant",
+  ]},
+  { id: "linge", emoji: "🧺", title: "Linge & Ménage", items: [
+    "Machine à laver (ou accès blanchisserie documenté)",
+    "Sèche-linge ou étendoir",
+    "Lessive disponible",
+    "Fer à repasser + planche",
+    "Aspirateur fonctionnel",
+    "Balai + pelle",
+    "Serpillière ou Swiffer",
+    "Produits ménagers (multi-surfaces, WC, vitres)",
+    "Sacs poubelle en stock",
+    "Stock linge de rechange propre sur place ou en dépôt",
+  ]},
+  { id: "securite", emoji: "🔒", title: "Sécurité & Urgences", items: [
+    "Trousse de premiers secours",
+    "Extincteur (recommandé)",
+    "Numéros d'urgence affichés (15, 17, 18, 112)",
+    "Contact gestionnaire affiché",
+    "Notice d'évacuation si immeuble",
+    "Disjoncteur localisé et documenté dans le livret",
+    "Coupure eau localisée et documentée",
+  ]},
+  { id: "listing", emoji: "📸", title: "Photos & Annonce", items: [
+    "Appartement nettoyé et mis en scène avant photos",
+    "Photos professionnelles (ou smartphone en lumière naturelle)",
+    "Photo de chaque pièce + détails (cuisine, SDB, vue)",
+    "Photo de l'entrée / façade immeuble",
+    "Photo du quartier / points d'intérêt proches",
+    "Titre accrocheur rédigé",
+    "Description complète (pièces, équipements, quartier, transports)",
+    "Équipements cochés dans Airbnb (WiFi, cuisine, machine à laver…)",
+    "Règles maison définies (check-in/out, animaux, fumeurs, fêtes)",
+    "Prix de base + tarif week-end configuré",
+    "Tarif nuit minimum et séjour minimum défini",
+    "Frais de ménage fixés",
+    "Politique d'annulation choisie",
+    "Calendrier de disponibilité ouvert",
+  ]},
+  { id: "hostaway", emoji: "⚙️", title: "Configuration Hostaway & Plateformes", items: [
+    "Appartement créé dans Hostaway",
+    "Connexion Airbnb synchronisée",
+    "Connexion Booking.com synchronisée (si applicable)",
+    "Connexion Abritel synchronisée (si applicable)",
+    "Markup commissions configuré (Airbnb +18%, Booking +22%, Abritel +13-15%)",
+    "Messages automatiques configurés (confirmation, J-2, check-in, check-out)",
+    "Livret d'accueil (guidebook) créé dans Airbnb",
+    "Premier avis sollicité après le premier séjour",
+  ]},
+  { id: "livret", emoji: "📖", title: "Livret d'accueil", items: [
+    "Instructions d'accès (digicode, clé, boîte à clé)",
+    "Code WiFi",
+    "Mode d'emploi TV / équipements",
+    "Consignes tri des déchets + sortie des poubelles",
+    "Règles maison (bruit, respect voisins, horaires)",
+    "Transports proches (métro, bus, Vélib')",
+    "Supermarchés et commerces de proximité",
+    "Restaurants recommandés",
+    "Contact en cas d'urgence ou problème",
+    "Instructions check-out (clé, état, poubelles)",
+  ]},
+];
+const TOTAL = SECTIONS.reduce((a, s) => a + s.items.length, 0);
+const APT_ICONS = ["🏠","🏢","🏡","🏗️","🏘️","🛋️","🔑","🏙️","🌆","🌇"];
+
+// ── STATE ─────────────────────────────────────────────────────────
+let apartments = {}; // { id: { name, createdAt } }
+let currentAptId = null;
+let currentChecked = {};
+let unsubChecked = null;
+let unsubApts = null;
+let aptToDelete = null;
+
+// ── STATUS ────────────────────────────────────────────────────────
+function setStatus(on) {
+  document.getElementById("status-dot").className = "status-dot" + (on ? " on" : "");
+  document.getElementById("status-text").textContent = on ? "Synchronisé" : "Connexion…";
+}
+
+// ── VIEWS ─────────────────────────────────────────────────────────
+function showHome() {
+  document.getElementById("view-home").className = "active";
+  document.getElementById("view-apt").className = "";
+  currentAptId = null;
+  if (unsubChecked) { unsubChecked(); unsubChecked = null; }
+}
+function showApt(aptId) {
+  document.getElementById("view-home").className = "";
+  document.getElementById("view-apt").className = "active";
+  currentAptId = aptId;
+  loadAptView(aptId);
+}
+
+// ── HOME ──────────────────────────────────────────────────────────
+function renderHome() {
+  const grid = document.getElementById("apt-grid");
+  // Keep add button
+  const addBtn = document.getElementById("btn-add-apt");
+  grid.innerHTML = "";
+
+  const ids = Object.keys(apartments);
+  if (ids.length === 0) {
+    // empty state
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.style.gridColumn = "1 / -1";
+    empty.innerHTML = `<div class="empty-state-icon">🏠</div><div class="empty-state-text">Aucun appartement encore.<br>Ajoute ton premier !</div>`;
+    grid.appendChild(empty);
+  } else {
+    ids.forEach((id, idx) => {
+      const apt = apartments[id];
+      const card = document.createElement("div");
+      card.className = "apt-card";
+      const icon = APT_ICONS[idx % APT_ICONS.length];
+
+      card.innerHTML = `
+        <button class="apt-card-delete" title="Supprimer" data-id="${id}">✕</button>
+        <div class="apt-card-icon">${icon}</div>
+        <div class="apt-card-name">${apt.name}</div>
+        <div class="apt-card-bar-bg"><div class="apt-card-bar-fill" id="bar-${id}" style="width:0%;background:#e8622a;"></div></div>
+        <div class="apt-card-pct" id="pct-${id}">Chargement…</div>
+      `;
+
+      card.addEventListener("click", (e) => {
+        if (e.target.closest(".apt-card-delete")) return;
+        showApt(id);
+      });
+
+      card.querySelector(".apt-card-delete").addEventListener("click", (e) => {
+        e.stopPropagation();
+        aptToDelete = id;
+        document.getElementById("modal-delete-sub").textContent =
+          `"${apt.name}" — toutes les données seront perdues définitivement.`;
+        document.getElementById("modal-delete").className = "modal-overlay open";
+      });
+
+      grid.appendChild(card);
+
+      // Load progress for card
+      onValue(ref(db, "checklists/" + id), (snap) => {
+        const data = snap.val() || {};
+        const count = Object.values(data).filter(Boolean).length;
+        const pct = Math.round((count / TOTAL) * 100);
+        const bar = document.getElementById("bar-" + id);
+        const pctEl = document.getElementById("pct-" + id);
+        if (bar) { bar.style.width = pct + "%"; bar.style.background = pct === 100 ? "#22c55e" : "#e8622a"; }
+        if (pctEl) pctEl.textContent = pct === 100 ? "✅ Complet" : pct + "% complété";
+      });
+    });
+  }
+
+  grid.appendChild(addBtn);
+}
+
+// ── APT VIEW ──────────────────────────────────────────────────────
+function loadAptView(aptId) {
+  const apt = apartments[aptId];
+  document.getElementById("apt-view-name").textContent = apt.name;
+  buildChecklist(aptId);
+
+  if (unsubChecked) { unsubChecked(); unsubChecked = null; }
+  unsubChecked = onValue(ref(db, "checklists/" + aptId), (snap) => {
+    currentChecked = snap.val() || {};
+    updateAptProgress();
+    refreshCheckboxes();
+  });
+}
+
+function buildChecklist(aptId) {
+  const container = document.getElementById("apt-checklist");
+  container.innerHTML = "";
+
+  SECTIONS.forEach(s => {
+    const section = document.createElement("div");
+    section.className = "cl-section";
+    section.id = "cls-" + s.id;
+
+    const header = document.createElement("div");
+    header.className = "cl-section-header";
+    header.innerHTML = `
+      <span class="cl-section-emoji">${s.emoji}</span>
+      <span class="cl-section-title">${s.title}</span>
+      <span class="cl-section-badge" id="clb-${s.id}">0/${s.items.length}</span>
+      <span class="cl-section-arrow" id="cla-${s.id}">▼</span>
+    `;
+
+    const body = document.createElement("div");
+    body.className = "cl-section-body";
+    body.id = "clbd-" + s.id;
+
+    s.items.forEach((item, i) => {
+      const row = document.createElement("div");
+      row.className = "cl-item";
+      row.innerHTML = `
+        <div class="cl-checkbox" id="clcb-${s.id}-${i}">
+          <svg width="10" height="8" viewBox="0 0 10 8" fill="none" style="display:none;" id="clck-${s.id}-${i}">
+            <path d="M1 4l2.5 2.5L9 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="cl-item-label" id="cllbl-${s.id}-${i}">${item}</span>
+      `;
+      row.addEventListener("click", () => {
+        const key = s.id + "-" + i;
+        const newVal = !currentChecked[key];
+        currentChecked[key] = newVal;
+        set(ref(db, "checklists/" + aptId + "/" + key), newVal);
+        updateAptProgress();
+        refreshCheckboxes();
+      });
+      body.appendChild(row);
+    });
+
+    // Actions
+    const actions = document.createElement("div");
+    actions.className = "cl-actions";
+    const btnAll = document.createElement("button");
+    btnAll.className = "cl-btn"; btnAll.textContent = "✓ Tout cocher";
+    btnAll.addEventListener("click", () => {
+      const updates = {};
+      s.items.forEach((_, i) => { currentChecked[s.id+"-"+i] = true; updates["checklists/"+aptId+"/"+s.id+"-"+i] = true; });
+      update(ref(db), updates);
+      updateAptProgress(); refreshCheckboxes();
+    });
+    const btnReset = document.createElement("button");
+    btnReset.className = "cl-btn"; btnReset.textContent = "↺ Réinitialiser";
+    btnReset.addEventListener("click", () => {
+      const updates = {};
+      s.items.forEach((_, i) => { currentChecked[s.id+"-"+i] = false; updates["checklists/"+aptId+"/"+s.id+"-"+i] = false; });
+      update(ref(db), updates);
+      updateAptProgress(); refreshCheckboxes();
+    });
+    actions.appendChild(btnAll); actions.appendChild(btnReset);
+    body.appendChild(actions);
+
+    let open = true;
+    header.addEventListener("click", () => {
+      open = !open;
+      body.style.display = open ? "block" : "none";
+      document.getElementById("cla-" + s.id).textContent = open ? "▲" : "▼";
+    });
+
+    section.appendChild(header);
+    section.appendChild(body);
+    container.appendChild(section);
+  });
+}
+
+function refreshCheckboxes() {
+  SECTIONS.forEach(s => {
+    const sc = s.items.filter((_, i) => currentChecked[s.id+"-"+i]).length;
+    const sectionEl = document.getElementById("cls-" + s.id);
+    const badgeEl = document.getElementById("clb-" + s.id);
+    if (sectionEl) sectionEl.className = "cl-section" + (sc === s.items.length ? " done" : "");
+    if (badgeEl) badgeEl.textContent = sc + "/" + s.items.length;
+    s.items.forEach((_, i) => {
+      const isChecked = !!currentChecked[s.id+"-"+i];
+      const cb = document.getElementById("clcb-" + s.id + "-" + i);
+      const ck = document.getElementById("clck-" + s.id + "-" + i);
+      const lbl = document.getElementById("cllbl-" + s.id + "-" + i);
+      if (cb) cb.className = "cl-checkbox" + (isChecked ? " checked" : "");
+      if (ck) ck.style.display = isChecked ? "block" : "none";
+      if (lbl) lbl.className = "cl-item-label" + (isChecked ? " checked" : "");
+    });
+  });
+}
+
+function updateAptProgress() {
+  const count = Object.values(currentChecked).filter(Boolean).length;
+  const pct = Math.round((count / TOTAL) * 100);
+  document.getElementById("apt-progress-fill").style.width = pct + "%";
+  document.getElementById("apt-progress-fill").style.background = pct === 100 ? "#22c55e" : "#e8622a";
+  document.getElementById("apt-progress-count").textContent = count + " / " + TOTAL + " éléments";
+  document.getElementById("apt-progress-pct").textContent = pct + "%";
+  document.getElementById("apt-progress-pct").style.color = pct === 100 ? "#22c55e" : "#e8622a";
+  document.getElementById("apt-success").className = "success-banner" + (pct === 100 ? " visible" : "");
+}
+
+// ── FIREBASE APARTMENTS LIST ──────────────────────────────────────
+unsubApts = onValue(ref(db, "apartments"), (snap) => {
+  apartments = snap.val() || {};
+  setStatus(true);
+  if (document.getElementById("view-home").className === "active") renderHome();
+}, () => setStatus(false));
+
+// ── MODALS ────────────────────────────────────────────────────────
+document.getElementById("btn-add-apt").addEventListener("click", () => {
+  document.getElementById("modal-add-input").value = "";
+  document.getElementById("modal-add").className = "modal-overlay open";
+  setTimeout(() => document.getElementById("modal-add-input").focus(), 100);
+});
+document.getElementById("modal-add-cancel").addEventListener("click", () => {
+  document.getElementById("modal-add").className = "modal-overlay";
+});
+document.getElementById("modal-add-confirm").addEventListener("click", () => {
+  const name = document.getElementById("modal-add-input").value.trim();
+  if (!name) return;
+  const newRef = push(ref(db, "apartments"));
+  set(newRef, { name, createdAt: Date.now() });
+  document.getElementById("modal-add").className = "modal-overlay";
+});
+document.getElementById("modal-add-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("modal-add-confirm").click();
+});
+
+document.getElementById("modal-delete-cancel").addEventListener("click", () => {
+  document.getElementById("modal-delete").className = "modal-overlay";
+  aptToDelete = null;
+});
+document.getElementById("modal-delete-confirm").addEventListener("click", () => {
+  if (!aptToDelete) return;
+  remove(ref(db, "apartments/" + aptToDelete));
+  remove(ref(db, "checklists/" + aptToDelete));
+  document.getElementById("modal-delete").className = "modal-overlay";
+  aptToDelete = null;
+});
+
+// ── BACK ──────────────────────────────────────────────────────────
+document.getElementById("btn-back").addEventListener("click", () => {
+  showHome();
+  renderHome();
+});
+
+// ── INIT ──────────────────────────────────────────────────────────
+showHome();
+</script>
+</body>
+</html>
